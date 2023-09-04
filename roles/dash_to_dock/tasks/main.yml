@@ -1,0 +1,116 @@
+- name: Set Extension name
+  set_fact:
+    extension_name: "{{ dash_to_dock.extension_name }}"  # Variable from extensions.yml
+
+- name: Get GNOME Shell version
+  command: "gnome-shell --version"
+  register: gnome_shell_version
+  changed_when: false
+
+- name: Extract major version from GNOME Shell version
+  set_fact:
+    gnome_shell_major_version: "{{ gnome_shell_version.stdout.split()[-1].split('.')[0] }}"
+    
+- name: Debug GNOME Shell major version
+  debug:
+    var: gnome_shell_major_version
+
+- name: Check if GNOME Shell is running
+  command: "pgrep -u {{ ansible_env.SUDO_USER }} gnome-shell"
+  register: gnome_shell_pid
+  ignore_errors: true
+  changed_when: false
+
+- name: Ensure GNOME Shell is running
+  fail:
+    msg: "GNOME Shell is not running"
+  when: gnome_shell_pid.rc != 0
+
+- name: Get available extension versions
+  uri:
+    url: "https://extensions.gnome.org/extension-info/?uuid={{ extension_name }}&shell_version={{ gnome_shell_major_version }}"
+    method: GET
+    return_content: yes
+  register: extension_info
+
+- name: Debug extension_info
+  debug:
+    var: extension_info
+
+- name: Extract shell_version_map
+  set_fact:
+    shell_version_map: "{{ extension_info.json.shell_version_map }}"
+    
+- name: Get extension version based on GNOME major version
+  set_fact:
+    extension_version_tag: "{{ shell_version_map[gnome_shell_major_version].pk }}"
+  when: gnome_shell_major_version in shell_version_map.keys()
+
+- name: Download the latest extension
+  uri:
+    url: "https://extensions.gnome.org/download-extension/{{ extension_name }}.shell-extension.zip?version_tag={{ extension_version_tag }}"
+    method: GET
+    dest: "/tmp/{{ extension_name }}-extension.zip"
+  register: download_result
+
+- name: Ensure download success
+  fail:
+    msg: "Failed to download {{ extension_name }} extension version {{ extension_version }}"
+  when: download_result.status != 200
+
+- name: Ensure destination directory exists
+  file:
+    path: "/home/{{ ansible_env.SUDO_USER }}/.local/share/gnome-shell/extensions/{{ extension_name }}"
+    state: directory
+    owner: "{{ ansible_env.SUDO_USER }}"
+    group: "{{ ansible_env.SUDO_USER }}"
+    mode: '0755'
+
+- name: Extract the extension
+  unarchive:
+    src: "/tmp/{{ extension_name }}-extension.zip"
+    dest: "/home/{{ ansible_env.SUDO_USER }}/.local/share/gnome-shell/extensions/{{ extension_name }}"
+    remote_src: yes
+  become_user: "{{ ansible_env.SUDO_USER }}"
+
+- name: Debug {{ extension_name }} installation path
+  debug:
+    var: ansible_env.HOME + '/.local/share/gnome-shell/extensions/{{ extension_name }}'
+
+- name: Debug {{ extension_name }} extension files
+  find:
+    paths: "{{ ansible_env.HOME + '/.local/share/gnome-shell/extensions/{{ extension_name }}' }}"
+    recurse: yes
+  register: extension_files
+
+- name: Debug {{ extension_name }} extension files
+  debug:
+    var: extension_files.files
+
+- name: Debug {{ extension_name }} extension folders
+  debug:
+    var: extension_files.dirs
+
+- name: Debug {{ extension_name }} extension links
+  debug:
+    var: extension_files.links
+
+- name: Enable {{ extension_name }} extension with dconf
+  command: >
+    dconf write /org/gnome/shell/enabled-extensions
+    "['{{ extension_name }}']"
+  become_user: "{{ ansible_env.SUDO_USER }}"
+
+- name: Debug enabled extensions
+  command: "dconf read /org/gnome/shell/enabled-extensions"
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  register: enabled_extensions
+
+- name: Debug enabled extensions
+  debug:
+    var: enabled_extensions.stdout
+
+- name: Confirm {{ extension_name }} extension is enabled
+  assert:
+    that: "'{{ extension_name }}' in enabled_extensions.stdout"
+

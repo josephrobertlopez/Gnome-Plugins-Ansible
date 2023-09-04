@@ -1,0 +1,13 @@
+---
+- name: Install GNOME Shell extensions
+  hosts: localhost
+  become: yes
+  gather_facts: yes
+ 
+  vars_files:
+    - extensions.yml  # Include the extensions configuration file
+
+  roles:
+    - clipboard_indicator
+    - dash_to_dock
+    - tiling_assistant
