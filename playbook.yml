@@ -11,3 +11,52 @@
     - clipboard_indicator
     - dash_to_dock
     - tiling_assistant
+
+  tasks:
+    - name: Enable {{ clipboard_indicator.extension_name }} extension
+      command: "gnome-extensions enable {{ clipboard_indicator.extension_name }}"
+      become_user: "{{ ansible_env.SUDO_USER }}"
+      async: 300  # Adjust this timeout as needed
+      poll: 0
+      ignore_errors: yes
+      register: clipboard_indicator_result
+
+    - name: Wait for {{ clipboard_indicator.extension_name }} extension to be enabled
+      async_status:
+        jid: "{{ clipboard_indicator_result.ansible_job_id }}"
+      register: clipboard_indicator_status
+      until: clipboard_indicator_status.finished
+      retries: 60  # Adjust this retry count as needed
+      delay: 5
+
+    - name: Enable {{ dash_to_dock.extension_name }} extension
+      command: "gnome-extensions enable {{ dash_to_dock.extension_name }}"
+      become_user: "{{ ansible_env.SUDO_USER }}"
+      async: 300  # Adjust this timeout as needed
+      poll: 0
+      ignore_errors: yes
+      register: dash_to_dock_result
+
+    - name: Wait for {{ dash_to_dock.extension_name }} extension to be enabled
+      async_status:
+        jid: "{{ dash_to_dock_result.ansible_job_id }}"
+      register: dash_to_dock_status
+      until: dash_to_dock_status.finished
+      retries: 60  # Adjust this retry count as needed
+      delay: 5
+
+    - name: Enable {{ tiling_assistant.extension_name }} extension
+      command: "gnome-extensions enable {{ tiling_assistant.extension_name }}"
+      become_user: "{{ ansible_env.SUDO_USER }}"
+      async: 300  # Adjust this timeout as needed
+      poll: 0
+      ignore_errors: yes
+      register: tiling_assistant_result
+
+    - name: Wait for {{ tiling_assistant.extension_name }} extension to be enabled
+      async_status:
+        jid: "{{ tiling_assistant_result.ansible_job_id }}"
+      register: tiling_assistant_status
+      until: tiling_assistant_status.finished
+      retries: 60  # Adjust this retry count as needed
+      delay: 5
